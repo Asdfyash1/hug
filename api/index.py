@@ -21,10 +21,12 @@ app = Flask(__name__)
 CORS(app)
 
 # ============== CONFIGURATION ==============
-DEFAULT_CLIP_LENGTH = 40
-DEFAULT_WINDOW_STEP = 10
+# Constants
+DEFAULT_CLIP_LENGTH = 40  # seconds
+DEFAULT_WINDOW_STEP = 30  # Increased from 10 for faster processing
 DEFAULT_MIN_CLIP_LENGTH = 25
 DEFAULT_MAX_CLIP_LENGTH = 60
+MAX_CANDIDATES = 10  # Limit candidates for faster AI processing
 
 HOOK_WORDS = [
     "wait", "shocking", "unbelievable", "secret", "crazy", "exposed", "omg", "wtf",
@@ -562,7 +564,7 @@ class ViralClipExtractor:
                     "end": min(start + clip_length, duration)
                 })
         
-        return candidates
+        return candidates[:MAX_CANDIDATES]  # Limit candidates for speed
 
 # ============== API ROUTES ==============
 
