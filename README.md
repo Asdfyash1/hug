@@ -42,7 +42,25 @@ Create a `.env` file or set these environment variables in your cloud dashboard:
 | :--- | :--- | :--- |
 | `GEMINI_API_KEY` | Google Gemini API Key | `mode=ai` |
 | `NVIDIA_API_KEY` | Nvidia/DeepSeek API Key | `mode=nvidia` |
+| `PROXY_URL` | Single proxy (format: `ip:port:user:pass`) | YouTube access (optional) |
+| `PROXY_API_URL` | WebShare API URL for proxy list | YouTube access (recommended) |
 | `PORT` | Server Port (Default: 5000) | Deployment |
+
+### 🔒 Proxy Setup (Bypass YouTube Bot Detection)
+
+For reliable YouTube access, especially on cloud platforms, configure proxies:
+
+**Option 1: Single Proxy**
+```bash
+PROXY_URL=31.59.20.176:6754:username:password
+```
+
+**Option 2: WebShare API (Recommended)**
+```bash
+PROXY_API_URL=https://proxy.webshare.io/api/v2/proxy/list/download/YOUR_TOKEN/-/any/username/direct/-/
+```
+
+**Manage Proxies:** Visit `/proxy` endpoint for web UI to add/monitor proxies and track bandwidth usage.
 
 ## 📚 API Usage
 
@@ -68,6 +86,40 @@ curl "http://localhost:5000/clips?url=https://youtu.be/VIDEO_ID&mode=ai"
 | `url` | string | Original YouTube URL |
 | `start` | float | Start time (seconds) |
 | `end` | float | End time (seconds) |
+
+### Proxy Management
+**Endpoint:** `GET /proxy` (Web UI) or `POST /proxy` (API)
+
+**Web UI Features:**
+- View bandwidth usage and statistics
+- Add single proxy or load from WebShare API
+- Monitor proxy rotation and performance
+
+**API Actions:**
+```bash
+# Add single proxy
+curl -X POST http://localhost:5000/proxy \
+  -H "Content-Type: application/json" \
+  -d '{"action": "add_single", "proxy": "ip:port:user:pass"}'
+
+# Load from WebShare API
+curl -X POST http://localhost:5000/proxy \
+  -H "Content-Type: application/json" \
+  -d '{"action": "add_api", "api_url": "https://proxy.webshare.io/..."}'
+
+# Get stats
+curl -X POST http://localhost:5000/proxy \
+  -H "Content-Type: application/json" \
+  -d '{"action": "get_stats"}'
+```
+
+## ⚡ Performance Optimizations
+
+- **Default Quality:** 480p (50% faster downloads, use `&quality=720` for higher quality)
+- **Concurrent Downloads:** 4 parallel fragment downloads
+- **AI Processing:** Max 10 candidates with 30s window step (~60% faster)
+- **Proxy Support:** Residential proxies for YouTube bot detection bypass
+- **Smart Caching:** Bandwidth tracking and persistent stats
 
 ## 📝 Credits
 Developed with ❤️ by **yash@dev**
