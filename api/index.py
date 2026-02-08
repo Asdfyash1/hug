@@ -227,16 +227,15 @@ class ViralClipExtractor:
         clip_id = f"clip_{uuid.uuid4().hex[:8]}"
         output_template = os.path.join(output_dir, f"{clip_id}.%(ext)s")
         
-        ydl_opts = {
-            **self.base_ydl_opts,
-            'format': f'bestvideo[height<={quality}]+bestaudio/best[height<={quality}]/best',
-            'outtmpl': output_template,
-            'download_ranges': lambda info, ydl: [{
+        ydl_opts = self._get_ydl_opts_with_proxy(
+            format=f'bestvideo[height<={quality}]+bestaudio/best[height<={quality}]/best',
+            outtmpl=output_template,
+            download_ranges=lambda info, ydl: [{
                 'start_time': start,
                 'end_time': end
             }],
-            'force_keyframes_at_cuts': True, 
-        }
+            force_keyframes_at_cuts=True
+        )
         
         try:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -362,10 +361,7 @@ class ViralClipExtractor:
     def extract_video_info(self, url: str) -> Dict:
         """Get video metadata"""
         logger.info(f"Extracting video info for: {url}")
-        ydl_opts = {
-            **self.base_ydl_opts,
-            'simulate': True,
-        }
+        ydl_opts = self._get_ydl_opts_with_proxy(simulate=True)
         
         try:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -398,13 +394,12 @@ class ViralClipExtractor:
     def fetch_full_transcript(self, url: str) -> List[Dict]:
         """Fetch full transcript once"""
         logger.info(f"Fetching full transcript for: {url}")
-        ydl_opts = {
-            **self.base_ydl_opts,
-            'skip_download': True,
-            'writesubtitles': True,
-            'writeautomaticsub': True,
-            'subtitleslangs': ['en'],
-        }
+        ydl_opts = self._get_ydl_opts_with_proxy(
+            skip_download=True,
+            writesubtitles=True,
+            writeautomaticsub=True,
+            subtitleslangs=['en']
+        )
         
         try:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
