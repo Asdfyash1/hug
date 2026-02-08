@@ -15,6 +15,7 @@ from io import StringIO
 import os
 import re
 from typing import Dict, List, Optional, Any
+from api.proxy_manager import ProxyManager
 
 app = Flask(__name__)
 CORS(app)
@@ -162,7 +163,11 @@ class ViralClipExtractor:
 
 
         # Proxy configuration (for bypassing YouTube datacenter IP blocks)
-        proxy_url = os.environ.get('PROXY_URL')  # Format: http://user:pass@host:port
+        proxy_url = os.environ.get('PROXY_URL')  # Single proxy or host:port:user:pass
+        proxy_api_url = os.environ.get('PROXY_API_URL')  # WebShare API URL
+        
+        # Initialize ProxyManager
+        self.proxy_manager = ProxyManager(proxy_url=proxy_url, api_url=proxy_api_url)
         
         self.base_ydl_opts = {
             'quiet': False,
@@ -177,15 +182,42 @@ class ViralClipExtractor:
             # 'ffmpeg_location': ffmpeg_dir # Removed, relying on PATH
         }
         
-        # Add proxy if configured
-        if proxy_url:
-            self.base_ydl_opts['proxy'] = proxy_url
-            logger.info(f"Using proxy: {proxy_url.split('@')[1] if '@' in proxy_url else proxy_url}")
+        # Bandwidth tracking
+        self.last_bandwidth_used = 0
+        self.last_proxy_used = None
         
         if ffmpeg_dir:
             logger.info(f"Added FFmpeg to PATH: {ffmpeg_dir}")
         else:
             logger.warning("FFmpeg NOT FOUND! Clip cutting will fail.")
+    
+    def _get_ydl_opts_with_proxy(self, **extra_opts):
+        """Get ydl_opts with current proxy from ProxyManager"""
+        opts = {**self.base_ydl_opts, **extra_opts}
+        
+        # Get next proxy from manager
+        proxy = self.proxy_manager.get_next_proxy()
+        if proxy:
+            opts['proxy'] = proxy
+            self.last_proxy_used = proxy
+            logger.info(f"Using proxy: {proxy.split('@')[1] if '@' in proxy else proxy}")
+        
+        return opts
+    
+    def _estimate_bandwidth(self, info_dict: dict) -> int:
+        """Estimate bandwidth used based on yt-dlp info dict"""
+        # Rough estimate based on formats and filesize
+        try:
+            filesize = info_dict.get('filesize') or info_dict.get('filesize_approx', 0)
+            if filesize:
+                return filesize
+            # Fallback: estimate from duration and quality
+            duration = info_dict.get('duration', 0)
+            # Assume ~1MB per minute for metadata/transcript operations
+            return int(duration * 1024 * 1024 / 60) if duration else 50000  # 50KB default
+        except:
+            return 50000  # 50KB default
+    
     
     def download_clip(self, url: str, start: float, end: float, quality: str = "720") -> Optional[str]:
         """Download and cut a clip"""
@@ -553,7 +585,341 @@ def index():
         }
     })
 
+@app.route('/proxy', methods=['GET', 'POST'])
+def proxy_management():
+    """Proxy management endpoint with web UI"""
+    global extractor
+    
+    if request.method == 'POST':
+        # Handle proxy configuration updates
+        try:
+            data = request.json or request.form
+            action = data.get('action')
+            
+            if action == 'add_single':
+                proxy_str = data.get('proxy')
+                if proxy_str:
+                    extractor.proxy_manager.add_proxy(proxy_str)
+                    return jsonify({"success": True, "message": "Proxy added successfully"})
+            
+            elif action == 'add_api':
+                api_url = data.get('api_url')
+                if api_url:
+                    extractor.proxy_manager.refresh_proxies(api_url)
+                    return jsonify({"success": True, "message": f"Loaded {len(extractor.proxy_manager.proxies)} proxies from API"})
+            
+            elif action == 'get_stats':
+                stats = extractor.proxy_manager.get_stats()
+                return jsonify({"success": True, "stats": stats})
+            
+            return jsonify({"success": False, "error": "Invalid action"})
+        
+        except Exception as e:
+            return jsonify({"success": False, "error": str(e)})
+    
+    # GET request - return web UI
+    stats = extractor.proxy_manager.get_stats()
+    
+    html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Proxy Management - Viral Clip Extractor</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <style>
+            * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+            body {{
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                min-height: 100vh;
+                padding: 20px;
+            }}
+            .container {{
+                max-width: 1200px;
+                margin: 0 auto;
+            }}
+            .header {{
+                background: white;
+                padding: 30px;
+                border-radius: 15px;
+                box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+                margin-bottom: 30px;
+            }}
+            .header h1 {{
+                color: #667eea;
+                margin-bottom: 10px;
+            }}
+            .header p {{
+                color: #666;
+            }}
+            .stats-grid {{
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+                gap: 20px;
+                margin-bottom: 30px;
+            }}
+            .stat-card {{
+                background: white;
+                padding: 25px;
+                border-radius: 15px;
+                box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            }}
+            .stat-card h3 {{
+                color: #667eea;
+                font-size: 14px;
+                text-transform: uppercase;
+                margin-bottom: 10px;
+            }}
+            .stat-card .value {{
+                font-size: 32px;
+                font-weight: bold;
+                color: #333;
+            }}
+            .stat-card .label {{
+                color: #999;
+                font-size: 12px;
+                margin-top: 5px;
+            }}
+            .config-section {{
+                background: white;
+                padding: 30px;
+                border-radius: 15px;
+                box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+                margin-bottom: 30px;
+            }}
+            .config-section h2 {{
+                color: #667eea;
+                margin-bottom: 20px;
+            }}
+            .form-group {{
+                margin-bottom: 20px;
+            }}
+            .form-group label {{
+                display: block;
+                margin-bottom: 8px;
+                color: #333;
+                font-weight: 500;
+            }}
+            .form-group input, .form-group textarea {{
+                width: 100%;
+                padding: 12px;
+                border: 2px solid #e0e0e0;
+                border-radius: 8px;
+                font-size: 14px;
+                transition: border-color 0.3s;
+            }}
+            .form-group input:focus, .form-group textarea:focus {{
+                outline: none;
+                border-color: #667eea;
+            }}
+            .form-group small {{
+                color: #999;
+                font-size: 12px;
+            }}
+            .btn {{
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                padding: 12px 30px;
+                border: none;
+                border-radius: 8px;
+                font-size: 16px;
+                font-weight: 600;
+                cursor: pointer;
+                transition: transform 0.2s, box-shadow 0.2s;
+            }}
+            .btn:hover {{
+                transform: translateY(-2px);
+                box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+            }}
+            .btn:active {{
+                transform: translateY(0);
+            }}
+            .proxy-list {{
+                background: white;
+                padding: 30px;
+                border-radius: 15px;
+                box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            }}
+            .proxy-list h2 {{
+                color: #667eea;
+                margin-bottom: 20px;
+            }}
+            .proxy-item {{
+                background: #f8f9fa;
+                padding: 15px;
+                border-radius: 8px;
+                margin-bottom: 10px;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            }}
+            .proxy-item .proxy-addr {{
+                font-family: 'Courier New', monospace;
+                color: #333;
+            }}
+            .proxy-item .bandwidth {{
+                color: #667eea;
+                font-weight: 600;
+            }}
+            .alert {{
+                padding: 15px;
+                border-radius: 8px;
+                margin-bottom: 20px;
+            }}
+            .alert-success {{
+                background: #d4edda;
+                color: #155724;
+                border: 1px solid #c3e6cb;
+            }}
+            .alert-error {{
+                background: #f8d7da;
+                color: #721c24;
+                border: 1px solid #f5c6cb;
+            }}
+            .progress-bar {{
+                background: #e0e0e0;
+                border-radius: 10px;
+                height: 20px;
+                overflow: hidden;
+                margin-top: 10px;
+            }}
+            .progress-fill {{
+                background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+                height: 100%;
+                transition: width 0.3s;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: white;
+                font-size: 12px;
+                font-weight: 600;
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <h1>🔒 Proxy Management</h1>
+                <p>Configure and monitor proxy settings for YouTube access</p>
+            </div>
+            
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <h3>Total Proxies</h3>
+                    <div class="value">{stats['total_proxies']}</div>
+                    <div class="label">Active proxies in rotation</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Bandwidth Used</h3>
+                    <div class="value">{stats['total_bandwidth_mb']} MB</div>
+                    <div class="label">Out of 1024 MB limit</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: {min(100, (stats['total_bandwidth_mb'] / 1024) * 100)}%">
+                            {round((stats['total_bandwidth_mb'] / 1024) * 100, 1)}%
+                        </div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <h3>Remaining</h3>
+                    <div class="value">{stats['bandwidth_remaining_mb']} MB</div>
+                    <div class="label">Available bandwidth</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Current Index</h3>
+                    <div class="value">{stats['current_proxy_index']}</div>
+                    <div class="label">Next proxy in rotation</div>
+                </div>
+            </div>
+            
+            <div class="config-section">
+                <h2>➕ Add Proxy</h2>
+                
+                <div class="form-group">
+                    <label>Single Proxy (Format: ip:port:user:pass)</label>
+                    <input type="text" id="single-proxy" placeholder="31.59.20.176:6754:username:password">
+                    <small>Example: 31.59.20.176:6754:nntlrciu:sx2noxvkj6y7</small>
+                </div>
+                <button class="btn" onclick="addSingleProxy()">Add Single Proxy</button>
+                
+                <hr style="margin: 30px 0; border: none; border-top: 1px solid #e0e0e0;">
+                
+                <div class="form-group">
+                    <label>WebShare API URL</label>
+                    <input type="text" id="api-url" placeholder="https://proxy.webshare.io/api/v2/proxy/list/download/...">
+                    <small>Paste your WebShare API URL to load all proxies automatically</small>
+                </div>
+                <button class="btn" onclick="addFromAPI()">Load from API</button>
+            </div>
+            
+            <div class="proxy-list">
+                <h2>📋 Active Proxies</h2>
+                <div id="proxy-list-container">
+                    {"".join([f'''
+                    <div class="proxy-item">
+                        <div class="proxy-addr">{p['proxy']}</div>
+                        <div class="bandwidth">{p['bandwidth_mb']} MB</div>
+                    </div>
+                    ''' for p in stats['per_proxy_stats']])}
+                </div>
+                {f'<p style="color: #999; text-align: center; margin-top: 20px;">No proxies configured yet</p>' if stats['total_proxies'] == 0 else ''}
+            </div>
+        </div>
+        
+        <script>
+            function addSingleProxy() {{
+                const proxy = document.getElementById('single-proxy').value;
+                if (!proxy) {{
+                    alert('Please enter a proxy');
+                    return;
+                }}
+                
+                fetch('/proxy', {{
+                    method: 'POST',
+                    headers: {{'Content-Type': 'application/json'}},
+                    body: JSON.stringify({{action: 'add_single', proxy: proxy}})
+                }})
+                .then(r => r.json())
+                .then(data => {{
+                    if (data.success) {{
+                        alert('Proxy added successfully!');
+                        location.reload();
+                    }} else {{
+                        alert('Error: ' + data.error);
+                    }}
+                }});
+            }}
+            
+            function addFromAPI() {{
+                const apiUrl = document.getElementById('api-url').value;
+                if (!apiUrl) {{
+                    alert('Please enter an API URL');
+                    return;
+                }}
+                
+                fetch('/proxy', {{
+                    method: 'POST',
+                    headers: {{'Content-Type': 'application/json'}},
+                    body: JSON.stringify({{action: 'add_api', api_url: apiUrl}})
+                }})
+                .then(r => r.json())
+                .then(data => {{
+                    if (data.success) {{
+                        alert(data.message);
+                        location.reload();
+                    }} else {{
+                        alert('Error: ' + data.error);
+                    }}
+                }});
+            }}
+        </script>
+    </body>
+    </html>
+    """
+    
+    return html
+
 @app.route('/health', methods=['GET'])
+
 def health():
     """Health check endpoint"""
     return jsonify({
