@@ -1,6 +1,6 @@
 """
 Viral Clip Extractor API
-Deploy to Vercel for YouTube viral clip analysis
+Deploy to Render for YouTube viral clip analysis
 """
 
 from flask import Flask, request, jsonify, send_file, after_this_request
@@ -143,6 +143,7 @@ class ViralClipExtractor:
         ffmpeg_path_system = shutil.which("ffmpeg")
         
         ffmpeg_location = None
+        ffmpeg_dir = None
         if os.path.exists(ffmpeg_path_local):
             ffmpeg_location = ffmpeg_path_local
             ffmpeg_dir = os.path.dirname(ffmpeg_location)
@@ -153,6 +154,7 @@ class ViralClipExtractor:
             # If on system path, we don't need to specify location for yt-dlp usually, 
             # but getting the dir is good practice
             ffmpeg_location = ffmpeg_path_system
+            ffmpeg_dir = os.path.dirname(ffmpeg_location)
             logger.info(f"Using System FFmpeg: {ffmpeg_location}")
         else:
             logger.warning("FFmpeg NOT FOUND! Clip cutting will fail.")

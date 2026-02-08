@@ -1,5 +1,5 @@
-# Use Python 3.9 Slim image
-FROM python:3.9-slim
+# Use Python 3.11 Slim image (Fixes deprecation warnings)
+FROM python:3.11-slim
 
 # Install system dependencies (FFmpeg)
 RUN apt-get update && \
@@ -26,4 +26,7 @@ ENV PYTHONUNBUFFERED=1
 EXPOSE 5000
 
 # Run with Gunicorn
-CMD gunicorn -w 4 -b 0.0.0.0:$PORT api.index:app
+# -w 1: Single worker to save RAM (Prevent OOM on Render Free Tier)
+# -t 120: 2-minute timeout for infinite video processing
+# --threads 4: Handle concurrent requests without extra RAM
+CMD gunicorn -w 1 --threads 4 -t 120 -b 0.0.0.0:$PORT api.index:app
