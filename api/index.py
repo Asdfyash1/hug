@@ -179,6 +179,11 @@ class ViralClipExtractor:
             },
             'http_headers': self.headers,
             'extractor_retries': 3,
+            # Performance optimizations
+            'socket_timeout': 30,  # Faster timeout
+            'concurrent_fragment_downloads': 4,  # Download fragments in parallel
+            'http_chunk_size': 10485760,  # 10MB chunks for better proxy performance
+            'retries': 3,
             # 'ffmpeg_location': ffmpeg_dir # Removed, relying on PATH
         }
         
@@ -219,7 +224,7 @@ class ViralClipExtractor:
             return 50000  # 50KB default
     
     
-    def download_clip(self, url: str, start: float, end: float, quality: str = "720") -> Optional[str]:
+    def download_clip(self, url: str, start: float, end: float, quality: str = "480") -> Optional[str]:
         """Download and cut a clip"""
         import uuid
         output_dir = "downloads"
@@ -227,8 +232,11 @@ class ViralClipExtractor:
         clip_id = f"clip_{uuid.uuid4().hex[:8]}"
         output_template = os.path.join(output_dir, f"{clip_id}.%(ext)s")
         
+        # Prefer smaller, faster formats
+        format_str = f'best[height<={quality}]/bestvideo[height<={quality}]+bestaudio/best'
+        
         ydl_opts = self._get_ydl_opts_with_proxy(
-            format=f'bestvideo[height<={quality}]+bestaudio/best[height<={quality}]/best',
+            format=format_str,
             outtmpl=output_template,
             download_ranges=lambda info, ydl: [{
                 'start_time': start,
