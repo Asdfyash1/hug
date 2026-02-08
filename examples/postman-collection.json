@@ -1,0 +1,152 @@
+{
+  "info": {
+    "name": "Viral Clip Extractor API",
+    "description": "API collection for extracting viral clips from YouTube videos",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Health Check",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/health",
+          "host": ["{{base_url}}"],
+          "path": ["health"]
+        },
+        "description": "Check if API is running"
+      }
+    },
+    {
+      "name": "API Info",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}",
+          "host": ["{{base_url}}"]
+        },
+        "description": "Get API information"
+      }
+    },
+    {
+      "name": "Extract Video Info",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"url\": \"https://youtube.com/watch?v=VIDEO_ID\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/extract",
+          "host": ["{{base_url}}"],
+          "path": ["extract"]
+        },
+        "description": "Extract basic video information"
+      }
+    },
+    {
+      "name": "Analyze Video (Full)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"url\": \"https://youtube.com/watch?v=VIDEO_ID\",\n  \"num_clips\": 5,\n  \"clip_length\": 40,\n  \"window_step\": 10,\n  \"quality\": \"720\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/analyze",
+          "host": ["{{base_url}}"],
+          "path": ["analyze"]
+        },
+        "description": "Full viral clip analysis"
+      }
+    },
+    {
+      "name": "Score Time Range",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"url\": \"https://youtube.com/watch?v=VIDEO_ID\",\n  \"start\": \"2:00\",\n  \"end\": \"2:40\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/score",
+          "host": ["{{base_url}}"],
+          "path": ["score"]
+        },
+        "description": "Score a specific time range"
+      }
+    },
+    {
+      "name": "Get Transcript",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"url\": \"https://youtube.com/watch?v=VIDEO_ID\",\n  \"start\": 120,\n  \"end\": 180\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/transcript",
+          "host": ["{{base_url}}"],
+          "path": ["transcript"]
+        },
+        "description": "Get transcript for a time range"
+      }
+    },
+    {
+      "name": "Get Download URL",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"url\": \"https://youtube.com/watch?v=VIDEO_ID\",\n  \"start\": \"2:00\",\n  \"end\": \"2:40\",\n  \"quality\": \"720\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/download",
+          "host": ["{{base_url}}"],
+          "path": ["download"]
+        },
+        "description": "Get download URL for a clip"
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "https://your-api.vercel.app",
+      "type": "string",
+      "description": "Your API base URL"
+    }
+  ]
+}

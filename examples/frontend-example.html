@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Viral Clip Extractor - Frontend Demo</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            color: #fff;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 2.5rem;
+            background: linear-gradient(90deg, #ff6b6b, #feca57);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .subtitle {
+            text-align: center;
+            color: #888;
+            margin-bottom: 30px;
+        }
+        
+        .input-section {
+            background: rgba(255,255,255,0.05);
+            border-radius: 16px;
+            padding: 25px;
+            margin-bottom: 20px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #aaa;
+            font-size: 0.9rem;
+        }
+        
+        input, select {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 8px;
+            background: rgba(0,0,0,0.3);
+            color: #fff;
+            font-size: 1rem;
+        }
+        
+        input:focus, select:focus {
+            outline: none;
+            border-color: #ff6b6b;
+        }
+        
+        .row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+        }
+        
+        button {
+            width: 100%;
+            padding: 14px 24px;
+            background: linear-gradient(90deg, #ff6b6b, #feca57);
+            border: none;
+            border-radius: 8px;
+            color: #1a1a2e;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(255,107,107,0.3);
+        }
+        
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+        }
+        
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 3px solid rgba(255,255,255,0.1);
+            border-top-color: #ff6b6b;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .results {
+            display: none;
+        }
+        
+        .video-info {
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .video-info h3 {
+            margin-bottom: 10px;
+            color: #feca57;
+        }
+        
+        .clip-card {
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 15px;
+            border-left: 4px solid #ff6b6b;
+            transition: transform 0.2s;
+        }
+        
+        .clip-card:hover {
+            transform: translateX(5px);
+        }
+        
+        .clip-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        
+        .clip-rank {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #ff6b6b;
+        }
+        
+        .clip-score {
+            background: linear-gradient(90deg, #ff6b6b, #feca57);
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-weight: bold;
+            color: #1a1a2e;
+        }
+        
+        .clip-time {
+            color: #888;
+            font-size: 0.9rem;
+            margin-bottom: 10px;
+        }
+        
+        .clip-reasons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+        
+        .reason-tag {
+            background: rgba(255,255,255,0.1);
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            color: #aaa;
+        }
+        
+        .transcript-preview {
+            color: #888;
+            font-style: italic;
+            font-size: 0.9rem;
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .clip-actions {
+            margin-top: 15px;
+            display: flex;
+            gap: 10px;
+        }
+        
+        .btn-small {
+            padding: 8px 16px;
+            font-size: 0.85rem;
+        }
+        
+        .btn-secondary {
+            background: rgba(255,255,255,0.1);
+            color: #fff;
+        }
+        
+        .error {
+            background: rgba(255,107,107,0.1);
+            border: 1px solid #ff6b6b;
+            border-radius: 8px;
+            padding: 15px;
+            color: #ff6b6b;
+            text-align: center;
+        }
+        
+        .api-config {
+            margin-bottom: 20px;
+        }
+        
+        .endpoint-selector {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+        
+        .endpoint-btn {
+            padding: 8px 16px;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 6px;
+            color: #fff;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .endpoint-btn.active {
+            background: #ff6b6b;
+            border-color: #ff6b6b;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔥 Viral Clip Extractor</h1>
+        <p class="subtitle">Extract the most viral moments from any YouTube video</p>
+        
+        <div class="input-section">
+            <div class="api-config">
+                <label>API Base URL</label>
+                <input type="text" id="apiUrl" placeholder="https://your-api.vercel.app" value="">
+            </div>
+            
+            <div class="endpoint-selector">
+                <button class="endpoint-btn active" data-endpoint="analyze">Analyze</button>
+                <button class="endpoint-btn" data-endpoint="extract">Extract Info</button>
+                <button class="endpoint-btn" data-endpoint="transcript">Transcript</button>
+            </div>
+            
+            <div class="form-group">
+                <label>YouTube URL</label>
+                <input type="text" id="videoUrl" placeholder="https://youtube.com/watch?v=...">
+            </div>
+            
+            <div id="analyzeOptions" class="options-section">
+                <div class="row">
+                    <div class="form-group">
+                        <label>Number of Clips</label>
+                        <input type="number" id="numClips" value="5" min="1" max="20">
+                    </div>
+                    <div class="form-group">
+                        <label>Clip Length (sec)</label>
+                        <input type="number" id="clipLength" value="40" min="10" max="120">
+                    </div>
+                    <div class="form-group">
+                        <label>Quality</label>
+                        <select id="quality">
+                            <option value="360">360p</option>
+                            <option value="720" selected>720p</option>
+                            <option value="1080">1080p</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="transcriptOptions" class="options-section" style="display:none;">
+                <div class="row">
+                    <div class="form-group">
+                        <label>Start Time (sec)</label>
+                        <input type="number" id="startTime" value="0" min="0">
+                    </div>
+                    <div class="form-group">
+                        <label>End Time (sec)</label>
+                        <input type="number" id="endTime" value="60" min="10">
+                    </div>
+                </div>
+            </div>
+            
+            <button id="analyzeBtn" onclick="analyzeVideo()">
+                🔍 Analyze Video
+            </button>
+        </div>
+        
+        <div id="loading" class="loading" style="display:none;">
+            <div class="spinner"></div>
+            <p>Analyzing video for viral clips...</p>
+        </div>
+        
+        <div id="error" class="error" style="display:none;"></div>
+        
+        <div id="results" class="results">
+            <div id="videoInfo" class="video-info"></div>
+            <div id="clipsList"></div>
+        </div>
+    </div>
+
+    <script>
+        let currentEndpoint = 'analyze';
+        
+        // Endpoint selector
+        document.querySelectorAll('.endpoint-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.endpoint-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                currentEndpoint = btn.dataset.endpoint;
+                
+                // Show/hide options
+                document.getElementById('analyzeOptions').style.display = 
+                    currentEndpoint === 'analyze' ? 'block' : 'none';
+                document.getElementById('transcriptOptions').style.display = 
+                    currentEndpoint === 'transcript' ? 'block' : 'none';
+                
+                // Update button text
+                const btnText = {
+                    'analyze': '🔍 Analyze Video',
+                    'extract': '📹 Extract Info',
+                    'transcript': '📝 Get Transcript'
+                };
+                document.getElementById('analyzeBtn').textContent = btnText[currentEndpoint];
+            });
+        });
+        
+        async function analyzeVideo() {
+            const apiUrl = document.getElementById('apiUrl').value.trim();
+            const videoUrl = document.getElementById('videoUrl').value.trim();
+            
+            if (!apiUrl) {
+                showError('Please enter your API base URL');
+                return;
+            }
+            if (!videoUrl) {
+                showError('Please enter a YouTube URL');
+                return;
+            }
+            
+            // Show loading
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('results').style.display = 'none';
+            document.getElementById('error').style.display = 'none';
+            
+            const endpoint = `${apiUrl.replace(/\/$/, '')}/${currentEndpoint}`;
+            
+            let body = { url: videoUrl };
+            
+            if (currentEndpoint === 'analyze') {
+                body.num_clips = parseInt(document.getElementById('numClips').value);
+                body.clip_length = parseInt(document.getElementById('clipLength').value);
+                body.quality = document.getElementById('quality').value;
+            } else if (currentEndpoint === 'transcript') {
+                body.start = parseInt(document.getElementById('startTime').value);
+                body.end = parseInt(document.getElementById('endTime').value);
+            }
+            
+            try {
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                
+                const data = await response.json();
+                
+                if (!data.success) {
+                    throw new Error(data.error || 'Unknown error');
+                }
+                
+                if (currentEndpoint === 'analyze') {
+                    displayResults(data);
+                } else if (currentEndpoint === 'extract') {
+                    displayVideoInfo(data.data);
+                } else if (currentEndpoint === 'transcript') {
+                    displayTranscript(data);
+                }
+                
+            } catch (err) {
+                showError(err.message);
+            } finally {
+                document.getElementById('loading').style.display = 'none';
+            }
+        }
+        
+        function displayResults(data) {
+            document.getElementById('results').style.display = 'block';
+            
+            // Video info
+            const videoInfo = document.getElementById('videoInfo');
+            videoInfo.innerHTML = `
+                <h3>📹 ${data.video_title}</h3>
+                <p>Duration: ${formatTime(data.video_duration)} | Clips found: ${data.clips.length}</p>
+            `;
+            
+            // Clips
+            const clipsList = document.getElementById('clipsList');
+            clipsList.innerHTML = data.clips.map((clip, i) => `
+                <div class="clip-card">
+                    <div class="clip-header">
+                        <span class="clip-rank">#${i + 1}</span>
+                        <span class="clip-score">${clip.viral_score}% Viral</span>
+                    </div>
+                    <div class="clip-time">
+                        ⏱️ ${clip.start_formatted} - ${clip.end_formatted} (${clip.duration}s)
+                    </div>
+                    <div class="clip-reasons">
+                        ${clip.reasons.map(r => `<span class="reason-tag">${r}</span>`).join('')}
+                    </div>
+                    ${clip.transcript_preview ? `
+                        <div class="transcript-preview">
+                            "${clip.transcript_preview}"
+                        </div>
+                    ` : ''}
+                    <div class="clip-actions">
+                        <a href="${clip.youtube_url}" target="_blank" class="btn-small">Open on YouTube</a>
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        function displayVideoInfo(data) {
+            document.getElementById('results').style.display = 'block';
+            document.getElementById('videoInfo').innerHTML = `
+                <h3>📹 ${data.title}</h3>
+                <p><strong>Channel:</strong> ${data.uploader}</p>
+                <p><strong>Duration:</strong> ${formatTime(data.duration)}</p>
+                <p><strong>Views:</strong> ${data.view_count?.toLocaleString() || 'N/A'}</p>
+                <p><strong>Upload Date:</strong> ${data.upload_date || 'N/A'}</p>
+                <p><strong>Chapters:</strong> ${data.chapters?.length || 0}</p>
+            `;
+            document.getElementById('clipsList').innerHTML = '';
+        }
+        
+        function displayTranscript(data) {
+            document.getElementById('results').style.display = 'block';
+            document.getElementById('videoInfo').innerHTML = `
+                <h3>📝 Transcript</h3>
+                <p>Time: ${data.start_formatted} - ${data.end_formatted}</p>
+                <p>Words: ${data.word_count}</p>
+            `;
+            document.getElementById('clipsList').innerHTML = `
+                <div class="clip-card">
+                    <p style="line-height: 1.6;">${data.transcript || 'No transcript available'}</p>
+                </div>
+            `;
+        }
+        
+        function showError(message) {
+            document.getElementById('error').textContent = message;
+            document.getElementById('error').style.display = 'block';
+        }
+        
+        function formatTime(seconds) {
+            if (!seconds) return 'N/A';
+            const mins = Math.floor(seconds / 60);
+            const secs = seconds % 60;
+            return `${mins}:${secs.toString().padStart(2, '0')}`;
+        }
+    </script>
+</body>
+</html>

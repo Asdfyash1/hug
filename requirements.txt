@@ -1,0 +1,36 @@
+# Viral Clip Extractor API - Dependencies
+# Python 3.9+
+
+# Web Framework
+flask==3.0.3
+flask-cors==4.0.1
+werkzeug==3.0.3
+
+# YouTube Download
+yt-dlp==2024.8.6
+google-generativeai==0.7.2
+openai==1.61.0 # For Nvidia API
+gunicorn==21.2.0 # Production Server
+
+# HTTP Requests
+requests==2.32.3
+urllib3==2.2.2
+certifi==2024.7.4
+charset-normalizer==3.3.2
+idna==3.7
+
+# Data Processing
+# (Using built-in json, re, typing modules)
+
+# Serverless Support
+# Vercel Python runtime handles these automatically
+# python-dateutil is often useful
+python-dateutil==2.8.2
+
+# Optional: For better JSON handling
+# (Using built-in json module)
+
+# Development dependencies (not needed for deployment)
+# pytest==8.3.2
+# black==24.8.0
+# flake8==7.1.1

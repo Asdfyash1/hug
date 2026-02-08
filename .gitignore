@@ -1,0 +1,13 @@
+# Python
+__pycache__/
+*.pyc
+venv/
+.env
+
+# Large Binaries (Not needed on repo, Docker installs them)
+ffmpeg/
+yt-dlp.exe
+
+# Editor
+.vscode/
+.idea/
