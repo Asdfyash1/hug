@@ -1136,7 +1136,13 @@ def debug_video():
         debug_info = {
             "step": "init",
             "proxy_manager_proxies": len(extractor.proxy_manager.proxies),
-            "last_proxy_used": None
+            "last_proxy_used": None,
+            "sub_url": None,
+            "sub_response_status": None,
+            "sub_response_length": None,
+            "sub_response_sample": None,
+            "available_subtitles": None,
+            "available_auto_captions": None
         }
         
         # 1. Get video info
@@ -1144,10 +1150,55 @@ def debug_video():
         video_info = extractor.extract_video_info(url)
         debug_info["last_proxy_used_after_video_info"] = extractor.last_proxy_used
         
-        # 2. Fetch transcript
-        debug_info["step"] = "fetch_full_transcript"
+        # 2. Manually debug transcript fetching
+        debug_info["step"] = "manual_subtitle_debug"
+        ydl_opts = extractor._get_ydl_opts_with_proxy(
+            skip_download=True,
+            writesubtitles=True,
+            writeautomaticsub=True,
+            subtitleslangs=['en']
+        )
+        debug_info["last_proxy_used_for_transcript"] = extractor.last_proxy_used
+        
+        try:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(url, download=False)
+                
+                # Get available subtitles
+                debug_info["available_subtitles"] = list(info.get('subtitles', {}).keys())
+                debug_info["available_auto_captions"] = list(info.get('automatic_captions', {}).keys())[:10]  # Limit to 10
+                
+                sub_url = None
+                if 'en' in info.get('subtitles', {}):
+                    sub_url = info['subtitles']['en'][-1].get('url')
+                    debug_info["sub_source"] = "subtitles"
+                elif 'en' in info.get('automatic_captions', {}):
+                    sub_url = info['automatic_captions']['en'][-1].get('url')
+                    debug_info["sub_source"] = "automatic_captions"
+                
+                debug_info["sub_url"] = sub_url[:150] if sub_url else None
+                
+                if sub_url:
+                    # Try to download subtitle
+                    proxies_dict = {}
+                    if extractor.last_proxy_used:
+                        proxies_dict = {
+                            'http': extractor.last_proxy_used,
+                            'https': extractor.last_proxy_used
+                        }
+                    
+                    try:
+                        response = requests.get(sub_url, headers=extractor.headers, proxies=proxies_dict, timeout=15)
+                        debug_info["sub_response_status"] = response.status_code
+                        debug_info["sub_response_length"] = len(response.text)
+                        debug_info["sub_response_sample"] = response.text[:300] if response.text else None
+                    except Exception as e:
+                        debug_info["sub_download_error"] = str(e)
+        except Exception as e:
+            debug_info["ydl_error"] = str(e)
+        
+        # 3. Now call normal transcript function
         transcript_segments = extractor.fetch_full_transcript(url)
-        debug_info["last_proxy_used_after_transcript"] = extractor.last_proxy_used
         
         debug_info["video_id"] = extract_video_id(url)
         debug_info["video_title"] = video_info.get('title')
@@ -1155,15 +1206,6 @@ def debug_video():
         debug_info["transcript_segments_count"] = len(transcript_segments)
         debug_info["transcript_sample"] = transcript_segments[:3] if transcript_segments else []
         debug_info["nvidia_key_present"] = bool(nvidia_key)
-        
-        # 3. Try AI analysis if key provided and transcript exists
-        if nvidia_key and transcript_segments:
-            try:
-                clips = extractor.analyze_with_nvidia(transcript_segments, nvidia_key)
-                debug_info["ai_clips_count"] = len(clips)
-                debug_info["ai_clips"] = clips
-            except Exception as e:
-                debug_info["ai_error"] = str(e)
         
         return jsonify(debug_info)
     
