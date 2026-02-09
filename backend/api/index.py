@@ -466,7 +466,16 @@ class ViralClipExtractor:
                     logger.warning("No transcript found")
                     return []
                 
-                response = requests.get(sub_url, headers=self.headers, timeout=15)
+                # Download subtitle with proxy support
+                proxies_dict = {}
+                if self.last_proxy_used:
+                    proxies_dict = {
+                        'http': self.last_proxy_used,
+                        'https': self.last_proxy_used
+                    }
+                    logger.info(f"Using proxy for subtitle download: {self.last_proxy_used.split('@')[1] if '@' in self.last_proxy_used else self.last_proxy_used}")
+
+                response = requests.get(sub_url, headers=self.headers, proxies=proxies_dict, timeout=15)
                 response.raise_for_status()
                 sub_text = response.text
                 
