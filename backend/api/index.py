@@ -512,6 +512,8 @@ class ViralClipExtractor:
                 
         except Exception as e:
             logger.error(f"Transcript error: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
             return []
     
     def get_transcript_text(self, segments: List[Dict], start: float, end: float) -> str:
@@ -1108,6 +1110,56 @@ def get_clips():
             "success": False,
             "error": str(e)
         }), 500
+
+@app.route('/debug_video', methods=['GET'])
+def debug_video():
+    """Debug endpoint to check transcript and AI analysis"""
+    try:
+        url = request.args.get('url')
+        if not url:
+            return jsonify({"error": "Missing 'url' parameter"}), 400
+        
+        nvidia_key = request.args.get('nvidia_key') or os.environ.get('NVIDIA_API_KEY')
+        
+        extractor = ViralClipExtractor()
+        
+        debug_info = {
+            "step": "init",
+            "proxy_manager_proxies": len(extractor.proxy_manager.proxies),
+            "last_proxy_used": None
+        }
+        
+        # 1. Get video info
+        debug_info["step"] = "extract_video_info"
+        video_info = extractor.extract_video_info(url)
+        debug_info["last_proxy_used_after_video_info"] = extractor.last_proxy_used
+        
+        # 2. Fetch transcript
+        debug_info["step"] = "fetch_full_transcript"
+        transcript_segments = extractor.fetch_full_transcript(url)
+        debug_info["last_proxy_used_after_transcript"] = extractor.last_proxy_used
+        
+        debug_info["video_id"] = extract_video_id(url)
+        debug_info["video_title"] = video_info.get('title')
+        debug_info["video_duration"] = video_info.get('duration')
+        debug_info["transcript_segments_count"] = len(transcript_segments)
+        debug_info["transcript_sample"] = transcript_segments[:3] if transcript_segments else []
+        debug_info["nvidia_key_present"] = bool(nvidia_key)
+        
+        # 3. Try AI analysis if key provided and transcript exists
+        if nvidia_key and transcript_segments:
+            try:
+                clips = extractor.analyze_with_nvidia(transcript_segments, nvidia_key)
+                debug_info["ai_clips_count"] = len(clips)
+                debug_info["ai_clips"] = clips
+            except Exception as e:
+                debug_info["ai_error"] = str(e)
+        
+        return jsonify(debug_info)
+    
+    except Exception as e:
+        import traceback
+        return jsonify({"error": str(e), "traceback": traceback.format_exc()}), 500
 
 @app.route('/extract', methods=['POST'])
 def extract_video():
