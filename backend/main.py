@@ -35,6 +35,24 @@ except ImportError:
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Heuristic Mode Constants
+DEFAULT_CLIP_LENGTH = 40
+DEFAULT_WINDOW_STEP = 30
+DEFAULT_MIN_CLIP_LENGTH = 25
+DEFAULT_MAX_CLIP_LENGTH = 60
+MAX_CANDIDATES = 10
+
+HOOK_WORDS = [
+    "wait", "shocking", "unbelievable", "secret", "crazy", "exposed", "omg", "wtf",
+    "plot twist", "insane", "cheating", "stunning", "mind blowing", "truth", "lie",
+    "revealed", "hidden", "discover", "amazing", "incredible", "must see", "urgent"
+]
+
+EMOTION_WORDS = [
+    "laugh", "cry", "angry", "shocked", "surprised", "scream", "love", "hate",
+    "disgusted", "horrified", "amazed", "excited", "sad", "happy", "furious"
+]
+
 # FastAPI app
 app = FastAPI(
     title="Viral Clip Extractor API",
@@ -204,6 +222,81 @@ class ViralClipExtractor:
             import traceback
             logger.error(traceback.format_exc())
             return []
+    
+    def get_transcript_text(self, segments: List[Dict], start: float, end: float) -> str:
+        """Filter transcript from pre-fetched segments"""
+        relevant = [
+            seg["text"] for seg in segments
+            if seg["end"] >= start and seg["start"] <= end and seg["text"].strip()
+        ]
+        return " ".join(relevant)
+    
+    def score_clip(self, transcript_segments: List[Dict], start: float, end: float) -> Dict:
+        """Calculate viral score for clip using heuristic analysis"""
+        transcript = self.get_transcript_text(transcript_segments, start, end).lower()
+        
+        score = 0
+        reasons = []
+        
+        # Hook words (up to 50 points)
+        hooks = [w for w in HOOK_WORDS if w in transcript]
+        hook_score = min(len(hooks) * 10, 50)
+        score += hook_score
+        if hooks:
+            reasons.append(f"Hooks: {', '.join(hooks[:3])}")
+        
+        # Emotion words (up to 30 points)
+        emotions = [w for w in EMOTION_WORDS if w in transcript]
+        emotion_score = min(len(emotions) * 6, 30)
+        score += emotion_score
+        if emotions:
+            reasons.append(f"Emotion: {', '.join(emotions[:2])}")
+        
+        # Conflict indicators (20 points)
+        conflict_words = ["but", "however", "argument", "fight", "wrong", "disagree"]
+        if any(w in transcript for w in conflict_words):
+            score += 20
+            reasons.append("Conflict detected")
+        
+        # Duration bonus
+        duration = end - start
+        if DEFAULT_MIN_CLIP_LENGTH <= duration <= DEFAULT_MAX_CLIP_LENGTH:
+            score += 10
+            reasons.append("Optimal duration")
+        elif duration < DEFAULT_MIN_CLIP_LENGTH:
+            score -= 10
+            reasons.append("Short clip")
+        elif duration > DEFAULT_MAX_CLIP_LENGTH:
+            score -= 5
+            reasons.append("Long clip")
+        
+        # Transcript quality bonus
+        word_count = len(transcript.split())
+        if word_count > 10:
+            score += 5
+            reasons.append("Good content density")
+        
+        return {
+            "start": start,
+            "end": end,
+            "duration": round(duration, 1),
+            "viral_score": max(0, min(score, 100)),
+            "reason": "; ".join(reasons) if reasons else "Heuristic analysis",
+        }
+    
+    def generate_candidates(self, video_duration: float, clip_length: int = None) -> List[Dict]:
+        """Generate candidate clips using sliding window"""
+        clip_length = clip_length or DEFAULT_CLIP_LENGTH
+        candidates = []
+        
+        # Sliding windows
+        for start in range(0, int(video_duration) - clip_length, DEFAULT_WINDOW_STEP):
+            candidates.append({
+                "start": start,
+                "end": min(start + clip_length, video_duration)
+            })
+        
+        return candidates[:MAX_CANDIDATES]  # Limit candidates for speed
     
     def analyze_with_nvidia(self, transcript_segments: List[Dict], api_key: str) -> List[Dict]:
         """Analyze transcript using Nvidia DeepSeek API"""
@@ -408,6 +501,17 @@ async def get_clips(
                 clips = extractor.analyze_with_nvidia(transcript, key)
             elif mode == "gemini" and key:
                 clips = extractor.analyze_with_gemini(transcript, key)
+            elif mode == "heuristic" or not key:
+                # Heuristic mode (default when no API key)
+                logger.info("Using heuristic mode for clip analysis")
+                video_duration = video_info.get("duration", 0)
+                if video_duration > 0:
+                    candidates = extractor.generate_candidates(video_duration)
+                    for cand in candidates:
+                        scored = extractor.score_clip(transcript, cand['start'], cand['end'])
+                        clips.append(scored)
+                    # Sort by viral score
+                    clips.sort(key=lambda x: x.get('viral_score', 0), reverse=True)
         
         return {
             "success": True,
