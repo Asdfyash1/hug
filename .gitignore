@@ -8,6 +8,12 @@ venv/
 ffmpeg/
 yt-dlp.exe
 
+# Downloads / Binary files
+downloads/
+*.webm
+*.mp4
+*.mkv
+
 # Editor
 .vscode/
 .idea/
