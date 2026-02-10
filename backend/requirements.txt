@@ -1,6 +1,6 @@
 # Core dependencies
-Flask>=2.3.0
-gunicorn>=21.0.0
+fastapi>=0.100.0
+uvicorn>=0.20.0
 yt-dlp>=2024.1.1
 requests>=2.31.0
 httpx>=0.25.0
